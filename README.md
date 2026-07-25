@@ -124,8 +124,31 @@ Exposed endpoints (after bringing it up):
 The `identity`, `product`, `order`, `payment`, and `inventory` databases
 are created automatically on the first Postgres startup.
 
-## Decision documentation (ADRs)
+## Project documentation
 
-Architectural decisions are recorded in `docs/adr/`. The index starts at
-`ADR-001` (the polyglot .NET + Go stack decision). See the other ADRs as
-they are added.
+This repo is built incrementally across many sessions. Before working on
+anything, read these three living documents (in order):
+
+1. **[`docs/status.md`](docs/status.md)** — where we are *right now*
+   (current phase, next 3 steps, blockers).
+2. **[`docs/roadmap.md`](docs/roadmap.md)** — the phased plan
+   (`Phase 0 → Phase 11`) with acceptance criteria.
+3. **[`docs/decisions-log.md`](docs/decisions-log.md)** — tactical decisions
+   during implementation (library picks, version pins).
+
+Architectural decisions are captured as **ADRs** in [`docs/adr/`](docs/adr/).
+The index starts at ADR-001 (the polyglot .NET + Go stack choice); ADRs
+002-010 cover Kafka, Saga, Outbox, Event Sourcing, CQRS, Avro, one-DB-per-
+service, idempotency, and observability.
+
+Operational guides live in [`docs/runbook/`](docs/runbook/) and are populated
+as each service is implemented.
+
+## Working with AI agents
+
+This repo ships a root [`AGENTS.md`](AGENTS.md) plus one `AGENTS.md` per
+service directory (`src/services/<name>/AGENTS.md`, `src/api-gateway/AGENTS.md`,
+`src/shared/AGENTS.md`). Any coding agent (opencode, Cursor, Copilot Chat)
+should read the root file first, then the service-specific one, before
+making changes. Conventions are enforced there so context carries across
+sessions and tools.

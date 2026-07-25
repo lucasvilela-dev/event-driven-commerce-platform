@@ -9,6 +9,25 @@ The project lives at `C:\Users\lucas\Desktop\Portifolio\event-driven-commerce-pl
 and is a portfolio-grade event-driven commerce platform. Treat it like a real
 production codebase, not a throwaway demo — code, tests, docs and CI all matter.
 
+## 0. Read these three docs before any work
+
+The project is built incrementally over many sessions, often with a fresh LLM
+context. To stay aligned across sessions:
+
+1. **`docs/status.md`** — where we are right now (current phase, next 3 steps,
+   blockers, decisions made this session). Read it first; update it at the end
+   of every session.
+2. **`docs/roadmap.md`** — the phased plan (`Phase 0 → Phase 11`), with
+   acceptance criteria and dependencies per phase. Do not skip phases; if the
+   plan must change, add a note in `status.md` and update `roadmap.md` in a
+   follow-up commit.
+3. **`docs/decisions-log.md`** — tactical, day-to-day decisions during
+   implementation (library choices, version pins, format conventions). Append
+   one entry per decision; do not delete history.
+
+If any of the three contradicts an ADR, the ADR wins for *architectural*
+choices; the decisions log wins for *tactical* ones.
+
 ## 1. Language policy
 
 - **Code, comments, commit messages, ADR titles/body, READMEs, runbooks,
@@ -145,5 +164,22 @@ All containers should show `(healthy)`.
 
 - Re-read the relevant ADR(s).
 - Check `docs/runbook/` if it covers the scenario.
+- Re-read `docs/status.md` (current phase) and `docs/roadmap.md` (the plan)
+  to confirm you're working on the right thing.
 - Prefer asking the user a crisp question over inventing an architectural choice.
 - New architectural question → propose an ADR draft, don't just write code.
+- New tactical decision (library, version, format) → append to
+  `docs/decisions-log.md` and mention it in `docs/status.md`.
+
+## 11. End-of-session hygiene
+
+Before stopping work:
+
+1. Update `docs/status.md`:
+   - Move the current phase to "What's done" if all its acceptance criteria
+     pass; otherwise leave it as current phase and note the active step.
+   - Rewrite the "Next 3 concrete steps" from the roadmap.
+   - Add any "Decisions made this session".
+2. If a tactical decision was made, append it to `docs/decisions-log.md`.
+3. Do not commit unless the user asks. When asked, write a conventional-commits
+   message and push to the working branch (default: `develop`).
