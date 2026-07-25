@@ -1,0 +1,182 @@
+name: edcp
+
+# =============================================================================
+# Event-Driven Commerce Platform — platform infrastructure
+# =============================================================================
+# Bring up:   docker compose up -d
+# Health:     docker compose ps
+# Logs:       docker compose logs -f <service>
+#
+# Platform services (does not include the application services yet).
+# Each microservice will have its own Dockerfile and will be added progressively.
+# =============================================================================
+
+networks:
+  edcp-net:
+    name: edcp-net
+    driver: bridge
+
+volumes:
+  kafka-data:
+    name: edcp-kafka-data
+  postgres-data:
+    name: edcp-postgres-data
+  redis-data:
+    name: edcp-redis-data
+  seq-data:
+    name: edcp-seq-data
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # Kafka (KRaft mode — no Zookeeper, the modern consensus mode)
+  # ---------------------------------------------------------------------------
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: edcp-kafka
+    restart: unless-stopped
+    networks: [edcp-net]
+    ports:
+      - "9092:9092"   # PLAINTEXT_HOST — local clients (host)
+    environment:
+      # --- Cluster identity / KRaft ---
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: "broker,controller"
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"   # valid base64 UUID (Confluent example)
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:29093"
+
+      # --- Listeners ---
+      KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,CONTROLLER://kafka:29093,PLAINTEXT_HOST://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
+
+      # --- Internal topics (single broker) ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
+      # --- Lean log retention for dev ---
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 10485760
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Schema Registry (Avro) — versioned contracts between producer/consumer
+  # ---------------------------------------------------------------------------
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    container_name: edcp-schema-registry
+    restart: unless-stopped
+    networks: [edcp-net]
+    ports:
+      - "8081:8081"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka:29092"
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
+      SCHEMA_REGISTRY_SCHEMA_REGISTRY_GROUP_ID: "edcp-schema-registry"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/subjects >/dev/null"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Kafka UI — visual inspection of topics, groups, schemas (dev only)
+  # ---------------------------------------------------------------------------
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: edcp-kafka-ui
+    restart: unless-stopped
+    networks: [edcp-net]
+    ports:
+      - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: "edcp"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka:29092"
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: "http://schema-registry:8081"
+      DYNAMIC_CONFIG_ENABLED: "true"
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — one instance, multiple databases (1 per service, DDD dogma)
+  # Databases created automatically: identity, product, order, payment, inventory
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: edcp-postgres
+    restart: unless-stopped
+    networks: [edcp-net]
+    ports:
+      - "15432:5432"   # host:15432 -> container:5432 (avoids conflict with local Postgres)
+    environment:
+      POSTGRES_USER: edcp
+      POSTGRES_PASSWORD: edcp_dev
+      POSTGRES_MULTIPLE_DATABASES: "identity,product,order,payment,inventory"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init-multi-db.sh:/docker-entrypoint-initdb.d/init-multi-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U edcp -d order >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # Redis — read-model cache (Product) + idempotency key (Inventory)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: edcp-redis
+    restart: unless-stopped
+    networks: [edcp-net]
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ---------------------------------------------------------------------------
+  # Seq — structured logging sink for Serilog (.NET) and JSON ingestion (Go)
+  # ---------------------------------------------------------------------------
+  seq:
+    image: datalust/seq:latest
+    container_name: edcp-seq
+    restart: unless-stopped
+    networks: [edcp-net]
+    ports:
+      - "8082:80"        # UI + ingest API
+    environment:
+      ACCEPT_EULA: "Y"
+      SEQ_FIRSTRUN_NOAUTHENTICATION: "true"   # local dev — no auth on the UI
+    volumes:
+      - seq-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
