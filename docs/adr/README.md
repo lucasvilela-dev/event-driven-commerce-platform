@@ -21,7 +21,8 @@ previous one (do not edit the revoked ADR; it is history).
 | [ADR-007](ADR-007-avro-schema-registry.md) | Avro + Schema Registry for versioned contracts | Accepted | 2026-07-25 |
 | [ADR-008](ADR-008-one-database-per-service.md) | One PostgreSQL database per service (DDD dogma) | Accepted | 2026-07-25 |
 | [ADR-009](ADR-009-idempotency-redis.md) | Idempotency via Redis in .NET and Go consumers | Accepted | 2026-07-25 |
-| [ADR-010](ADR-010-observability-seq-tracecontext.md) | Observability: Seq + W3C trace context | Accepted | 2026-07-25 |
+| [ADR-010](ADR-010-observability-seq-tracecontext.md) | Observability: Seq + W3C trace context | Accepted (impl. amended by ADR-015) | 2026-07-25 |
+| [ADR-015](ADR-015-native-distributed-tracing-propagators.md) | Native distributed-tracing propagators (.NET `Activity` + Go OTel `propagation`) | Accepted | 2026-07-26 |
 
 ## Planned ADRs (future)
 
@@ -29,6 +30,8 @@ previous one (do not edit the revoked ADR; it is history).
 - **ADR-012:** Testing strategy (unit + integration with Testcontainers +
   contract tests via Avro).
 - **ADR-013:** Kubernetes deploy (Helm) — when evolving from Docker Compose.
+- **ADR-014:** (reserved) Identity approach — Duende IdentityServer vs
+  hand-rolled JWT (decide in Phase 2).
 
 ## Quick dependency map across ADRs
 
