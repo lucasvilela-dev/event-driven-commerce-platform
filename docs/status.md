@@ -7,10 +7,11 @@
 
 ## Current phase
 
-**Phase 1 — Shared contracts & observability helpers** (`[next]` in the roadmap)
+**Phase 2 — Identity service** (`[next]` in the roadmap, after Phase 1 done).
 
 Start date: not started yet.
-Active step: — (pick the first Avro schema to write).
+Active step: — (decide IdentityServer vs custom JWT in a mini-ADR,
+then scaffold the 4 Clean Architecture projects).
 
 ## What's done
 
@@ -29,17 +30,51 @@ Active step: — (pick the first Avro schema to write).
     https://github.com/lucasvilela-dev/event-driven-commerce-platform
     (commit `411a39e`).
 
+- ✅ **Phase 1 — Shared contracts & observability helpers** (`2026-07-26`)
+  - 18 v1 Avro schemas written under `src/shared/contracts/`:
+    12 events + 5 commands + 1 `order.events-value` union (3 Order event
+    types). All validate as JSON.
+  - `src/shared/contracts/README.md` with the schema → topic → subject
+    → producer/consumer map, envelope conventions, money/timestamp rules,
+    BACKWARD evolution cheat-sheet, and the manual registration snippet.
+  - `order.events` modelled as a single Avro union subject
+    (`order_events_value_v1.avsc`); other aggregates' topics stay 1:1
+    file↔topic↔subject. Decision logged.
+  - **Schema Registry registration deferred to first producer** — manual
+    pre-registration has no value (Confluent auto-registers on first
+    produce with `auto.register.schemas=true`). CI compat-check job
+    planned for Phase 10. Decision logged.
+  - `OpenCode.TraceContext` (.NET 10) at
+    `src/shared/observability/dotnet/OpenCode.TraceContext/`:
+    thin carriers over `System.Diagnostics.DistributedContextPropagator`
+    + an `ActivitySource`; `ReadFrom/WriteTo HTTP|Kafka`,
+    `StartChild[FromHttp|FromKafka]Headers`, `AlwaysSample()`
+    (registers an `ActivityListener` for no-OTLP Seq-only setup), and a
+    Serilog `WithActivityTrace()` enricher reading `Activity.Current`.
+    BCL only — no extra NuGet. 12 xUnit tests passing.
+  - Go `tracecontext` package at
+    `src/shared/observability/go/tracecontext/` (module
+    `github.com/lucasvilela-dev/edcp/shared/observability`):
+    thin carriers over `go.opentelemetry.io/otel/propagation.TraceContext`
+    (v1.35.0, Go-1.24-compatible). `From/Into HTTP|Kafka Headers`,
+    `SpanContextFromContext`, `ContextWithSpanContext`,
+    `NewRootSpanContext`. `go vet` clean, ~72% coverage.
+  - `src/shared/observability/README.md` with API symmetry table and
+    service-consumption guidance.
+
 ## Next 3 concrete steps
 
-1. **Draft the Avro schemas** for the core order flow:
-   `order_created_v1.avsc`, `inventory_reserved_v1.avsc`,
-   `payment_approved_v1.avsc` — enough to register the first three
-   `<topic>-value` subjects in Schema Registry with BACKWARD compatibility.
-2. **Write `src/shared/contracts/README.md`** listing the schema → topic →
-   producer/consumer mapping, so future agents can navigate it.
-3. **Implement `OpenCode.TraceContext` (.NET) + `tracecontext` (Go) helpers**
-   in `src/shared/observability/` with unit tests; trace propagation is
-   cheap now, expensive to retrofit later.
+1. **Decide Identity approach** — `Duende IdentityServer` (full OIDC +
+   JWKS out of the box, more impressive but heavier) vs a lightweight
+   hand-rolled JWT issuer (smaller surface, more code to test). Write the
+   decision as a mini-ADR (ADR-014 perhaps) and add a row to the ADR index.
+2. **Scaffold the Identity Clean Architecture projects** under
+   `src/services/identity/` — `Identity.Domain`, `Identity.Application`,
+   `Identity.Infrastructure`, `Identity.Api` + a `.sln` + test projects,
+   referencing `OpenCode.TraceContext` from `src/shared/observability/dotnet/`.
+3. **Implement `Register` + `Login` + `/jwks`** (Phase 2 acceptance
+   criteria) with EF Core (Postgres `identity` DB) and Serilog → Seq;
+   backstop with an integration test on Testcontainers.
 
 ## Blockers
 
@@ -58,15 +93,43 @@ None.
 - Adopted **roadmap-driven development** with `docs/roadmap.md` (plan) +
   `docs/status.md` (state) + `docs/decisions-log.md` (tactical).
 - Adopted **.NET 10** as the target framework (was .NET 8 in initial draft).
+- Modelled `order.events` as a single Avro union subject
+  (`order.events-value`) rather than splitting into per-event topics
+  (`order.events.created`, ...). Individual Order event records live
+  alongside the union file for navigation; only the union is
+  registered. Other aggregates' event topics stay 1:1 schema↔subject.
+- Frozen envelope: events carry `event_id` (UUIDv7), `aggregate_id`,
+  `occurred_at` ( millis UTC). Commands carry `command_id`,
+  `aggregate_id`, `correlation_id`, `reply_to`, `issued_at`. Money =
+  `bytes`/decimal(14,2). `traceparent` is a Kafka header, never in
+  the payload (ADR-010).
+- Deferred manual Schema-Registry registration to the first producer
+  (Confluent auto-registers). CI compat-check deferred to Phase 10.
+- `.NET` helper assembly called `OpenCode.TraceContext` (matches the
+  name in `src/shared/AGENTS.md`). Go module = `github.com/lucasvilela-dev/
+  edcp/shared/observability`, package `tracecontext`. Services will
+  consume via project/module reference; Go services add a `replace`
+  pointing at `../../shared/observability/go` until a version tag is cut.
+- Solution `OpenCode.TraceContext.sln` added at
+  `src/shared/observability/dotnet/` to enable `dotnet format`.
+- **Refactored observability helpers to native propagators (ADR-015,
+  amends ADR-010's *implementation*):** dropped the ~250-LOC
+  hand-rolled `TraceParent` parser on both sides; replaced with thin
+  carriers over `System.Diagnostics.DistributedContextPropagator` (.NET)
+  and `go.opentelemetry.io/otel/propagation.TraceContext` (Go). On the
+  wire format unchanged (W3C `traceparent`); `tracestate` now propagated
+  automatically. BCL-only on .NET; adds OTel API v1.35 on Go.
 
 ## Stack versions currently in use
 
 | Component | Version | Notes |
 |---|---|---|
-| .NET | 10 | target for `Identity`, `Product`, `Order`, `Payment`, API Gateway |
-| Go | latest stable | target for `Inventory`, `Notification`, `Shipping` |
+| .NET | 10 (installed SDK `10.0.100`) | target for `Identity`, `Product`, `Order`, `Payment`, API Gateway, and `OpenCode.TraceContext` helper |
+| Go | `1.24.1` (windows/amd64) | target for `Inventory`, `Notification`, `Shipping`, and `tracecontext` helper |
+| Serilog | `4.0.0` | pulled by `OpenCode.TraceContext` package |
+| OpenTelemetry API (Go) | `go.opentelemetry.io/otel` v1.35.0 + `.../otel/trace` v1.35.0 | propagation only — no SDK / OTLP exporter (ADR-015) |
 | Kafka | Confluent `cp-kafka 7.6.1` (KRaft) | single broker dev; 3 brokers prod |
-| Schema Registry | `cp-schema-registry 7.6.1` | BACKWARD compatibility default |
+| Schema Registry | `cp-schema-registry 7.6.1` | BACKWARD compatibility default; auto-register on first produce |
 | Postgres | `16-alpine` | one DB per service |
 | Redis | `7-alpine` | read models + idempotency |
 | Seq | `datalust/seq:latest` | no auth in dev |

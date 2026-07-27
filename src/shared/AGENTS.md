@@ -39,10 +39,23 @@ Registry: `<topic>-value` (matches the Kafka topic name, ADR-007).
 
 ## observability/
 
-- `Opencode.TraceContext` (.NET): helpers to read `traceparent` from Kafka
-  headers / HTTP headers and push into `LogContext`.
-- `tracecontext` (Go): small package exposing `FromKafkaHeaders(h) context.Context`
-  and `FromHttpHeaders(h) context.Context`.
+Implementation governed by ADR-010 as **amended by ADR-015** (native
+distributed-tracing propagators replace the previously hand-rolled
+`TraceParent` parser).
+
+- `OpenCode.TraceContext` (.NET 10, BCL only): thin carriers over
+  `System.Diagnostics.DistributedContextPropagator` + an
+  `ActivitySource` named `"OpenCode.TraceContext"`. Exposes
+  `ReadFrom/WriteTo HTTP|Kafka`, `StartChild[FromHttp|FromKafka]Headers`,
+  `AlwaysSample()` (registers an `ActivityListener` so
+  `ActivitySource.StartActivity` returns non-null in a no-OTLP setup),
+  and a Serilog enricher reading `Activity.Current` (`.WithActivityTrace()`).
+- `tracecontext` (Go): thin carriers over
+  `go.opentelemetry.io/otel/propagation.TraceContext`. Exposes
+  `From/Into HTTP|Kafka Headers`, `SpanContextFromContext`,
+  `ContextWithSpanContext`, `NewRootSpanContext`. No TracerProvider /
+  OTLP export here — Seq stays the only sink.
 
 No Serilog/zerolog configuration lives here — each service owns its own
-logger setup; this folder only exposes propagation helpers.
+logger setup; this folder only exposes propagation helpers + the
+enricher(s) tied to `Activity.Current` / `trace.SpanContext`.
