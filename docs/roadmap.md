@@ -121,6 +121,14 @@ service), ADR-010 (observability).
 
 **Effort:** M.
 
+> **Deferred from Phase 2 (tracked here so it is not lost):**
+> `/api/identity/refresh` endpoint + refresh-token rotation. Phase 2
+> only *issues* a refresh JWT at `/login`; the rotation endpoint and
+> the `refresh_tokens` table (`revoked_at`/`replaced_by`/`family_id`
+> with reuse-detection) are deferred to a later mini-phase — revisit
+> after Phase 8 (Gateway) once the auth surface is exercised
+> end-to-end.
+
 ---
 
 ## Phase 3 — Product catalog (CQRS + Redis read models) `[planned]`
