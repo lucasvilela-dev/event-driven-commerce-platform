@@ -6,6 +6,9 @@ namespace Identity.Infrastructure.Persistence.Configurations;
 
 public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
 {
+    public static readonly Guid CustomerRoleId = Guid.Parse("a1b2c3d4-0001-0001-0001-000000000001");
+    public static readonly Guid AdminRoleId = Guid.Parse("a1b2c3d4-0001-0001-0001-000000000002");
+
     public void Configure(EntityTypeBuilder<Role> builder)
     {
         builder.ToTable("roles");
@@ -15,5 +18,10 @@ public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
         builder.Property(r => r.NormalizedName).HasMaxLength(128).IsRequired();
 
         builder.HasIndex(r => r.NormalizedName).IsUnique();
+
+        builder.HasData(
+            new Role { Id = CustomerRoleId, Name = "customer", NormalizedName = "CUSTOMER" },
+            new Role { Id = AdminRoleId, Name = "admin", NormalizedName = "ADMIN" }
+        );
     }
 }

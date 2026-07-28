@@ -9,5 +9,4 @@ public sealed class JwtIssuerOptions
     public int AccessTokenMinutes { get; set; } = 15;
     public int RefreshTokenDays { get; set; } = 7;
     public string SigningKeyPath { get; set; } = string.Empty;
-    public string KeyId { get; set; } = string.Empty;
 }

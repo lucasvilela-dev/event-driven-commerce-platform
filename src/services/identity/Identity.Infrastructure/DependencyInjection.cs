@@ -16,14 +16,17 @@ public static class DependencyInjection
         services.Configure<JwtIssuerOptions>(configuration.GetSection(JwtIssuerOptions.SectionName));
 
         services.AddDbContext<IdentityDbContext>(opts =>
-            opts.UseNpgsql(configuration.GetConnectionString("Identity")));
+            opts.UseNpgsql(configuration.GetConnectionString("Identity"),
+                npgsql => npgsql.MigrationsAssembly(typeof(IdentityDbContext).Assembly.FullName)));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
 
         services.AddSingleton(sp =>
         {
             var jwtOpts = sp.GetRequiredService<IOptions<JwtIssuerOptions>>().Value;
-            return new SigningKeyProvider(jwtOpts.KeyId, jwtOpts.SigningKeyPath);
+            return new SigningKeyProvider(jwtOpts.SigningKeyPath);
         });
 
         services.AddSingleton<ITokenIssuer>(sp =>

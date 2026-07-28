@@ -10,9 +10,10 @@
 **Phase 2 — Identity service** (`[next]` in the roadmap, after Phase 1 done).
 
 Start date: 2026-07-27.
-Active step: implement `Register` + `Login` + `/.well-known/jwks`
-(Phase 2 step 3). Scaffold done — 6 projects, `Identity.sln`, build
-green, smoke tests passing.
+Active step: Phase 2 step 3 committed on `feat/identity-scaffold`
+and pushed; PR pending `gh auth login` (Docker Desktop must be
+running for the Testcontainers integration test to validate locally
+before merge).
 
 ## What's done
 
@@ -65,11 +66,24 @@ green, smoke tests passing.
 
 ## Next 3 concrete steps
 
-1. **Implement `Register` + `Login`** handlers (MediatR) plus a
-   `IUserRepository`/`IRoleRepository` over `IdentityDbContext`, with
-   email-normalization, duplicate-email rejection, the default
-   `customer` role assigned on register, and login issuing the
-   `TokenPair` via `ITokenIssuer`.
+1. **Run the `Identity.IntegrationTests` Testcontainers suite locally**
+   (start Docker Desktop on the dev machine, then
+   `dotnet test --filter IntegrationTests`). Confirm register→login
+   → JWT-validated-against-`/.well-known/jwks` is green; fix any
+   EOF/runtime surprises from the live Postgres + JWT validation
+   step before opening the PR.
+2. **Authenticate `gh` and open the PR** `feat/identity-scaffold →
+   develop` (run `& "$env:LOCALAPPDATA\Programs\gh\gh.exe" auth login`
+   once in a terminal with browser access; I'll then call
+   `gh pr create --base develop --title "feat(identity): scaffold +
+   register/login/jwks (Phase 2, ADR-014)"`). Body to include the
+   acceptance-criteria checklist from `docs/roadmap.md` Phase 2.
+3. **Write `docs/runbook/identity.md`** — local run (HTTPS
+   `https://localhost:5001`, env vars: `Jwt:Issuer`,
+   `Jwt:SigningKeyPath`, `ConnectionStrings:Identity`, `Seq` URL),
+   signing-key generation snippet, JWKS rotation procedure, and the
+   "no /refresh in Phase 2 — refresh JWT issuance only" caveat.
+   Closes Phase 2; then move to Phase 3 (Product catalog).
 2. **Add `/.well-known/openid-configuration` + `/.well-known/jwks`
    controllers** in `Identity.Api` returning the minimal discovery doc
    and the RSA public key JWK (RFC 7517 + RFC 7638 `kid`).
@@ -81,7 +95,13 @@ green, smoke tests passing.
 
 ## Blockers
 
-None.
+- **Docker Desktop is not running** on the dev machine — the
+  `Identity.IntegrationTests` Testcontainers suite (register →
+  login → JWT-validation-against-`/.well-known/jwks`) cannot execute
+  locally until Docker Desktop is started. Unit tests pass (6/6).
+- **`gh` CLI not authenticated** — branch `feat/identity-scaffold`
+  was pushed; PR creation pending `gh auth login` (or manual creation
+  via the URL GitHub returned on push).
 
 ## Open questions
 
@@ -110,6 +130,48 @@ None.
   `/.well-known/openid-configuration` is minimal and non-conformant
   (no `authorization_endpoint`, etc.) — it exists only to bootstrap
   the JWKS URI and issuer for downstream validators.
+
+- **Phase 2 step 3 (Identity service implementation) landed** on
+  `feat/identity-scaffold`:
+  - `IUserRepository`/`IRoleRepository` implementations over
+    `IdentityDbContext` (eager-load `User.Roles.Role`).
+  - MediatR handlers: `RegisterHandler` (normalize email → reject
+    duplicate → fetch `customer` role → hash pw via
+    `IPasswordHasher<ApplicationUser>` → insert → save) and
+    `LoginHandler` (lookup → verify → bump `LastLoginAt` → issue
+    `TokenPair` via `ITokenIssuer`).
+  - `IdentityController` (`POST /api/identity/register` + `/login`)
+    with `DuplicateEmailException`→409, `RoleNotFoundException`→500,
+    `InvalidCredentialsException`→401 mapping.
+  - `DiscoveryController` (`/.well-known/openid-configuration` —
+    minimal non-conformant doc: `issuer`, `jwks_uri`,
+    `token_endpoint`, `id_token_signing_alg_values_supported=["RS256"]`,
+    `subject_types_supported=["public"]`).
+  - `JwksController` (`/.well-known/jwks` — single RSA JWK with
+    `kid` = RFC 7638 SHA-1 thumbprint of the SPKI, `n`+`e`
+    base64url-encoded).
+  - `SigningKeyProvider` upgraded to compute RFC 7638 `kid` from the
+    RSA public key (no more `Jwt:KeyId` config string). ADR-014
+    captured this; `appsettings.json` + `JwtIssuerOptions` cleaned.
+  - EF Core migration `InitialIdentity` (via `dotnet ef migrations
+    add`): creates `users`/`roles`/`user_roles` tables with FKs +
+    indexes + `HasData` seed of `customer`/`admin` roles. DbContext
+    wired with `MigrationsAssembly(typeof(IdentityDbContext).Assembly)`.
+  - Unit tests (6, xUnit/NSubstitute/FluentAssertions): RegisterHandler
+    success + duplicate-email + missing-role; LoginHandler unknown +
+    wrong-password + happy-path issues tokens and persists.
+    `Identity.Api.Tests` builds and 6/6 pass.
+  - Testcontainers integration test (`IdentityEndToEndTests`,
+    `IdentityWebFactory: WebApplicationFactory<Program> +
+    IAsyncLifetime` with a `postgres:16-alpine` container):
+    discovery doc, JWKS single RSA key, register→duplicate-email→login
+    round-trip with JWT signature **validated against the live
+    `/.well-known/jwks`** and `sub`/`email`/`role=customer` claims
+    asserted, wrong-password 401, unknown-user 401. **Skipped locally
+    because Docker Desktop is not running — to run, start Docker
+    Desktop and `dotnet test --filter IntegrationTests`.**
+  - `Identity.Api.Tests` `SmokeTests.cs` removed (replaced by real
+    handler tests).
 
 - **Identity scaffold landed** under `src/services/identity/`: 4 Clean
   Architecture projects + `Identity.Api.Tests` (unit) +
