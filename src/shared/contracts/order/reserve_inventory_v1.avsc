@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "ReserveInventory",
+  "namespace": "com.edcp.order.commands",
+  "doc": "Command sent by the Order Saga to the Inventory Service to reserve stock for an order. Topic `order.commands.reserve-inventory` (subject `order.commands.reserve-inventory-value`).",
+  "fields": [
+    { "name": "command_id", "type": "string", "doc": "UUIDv7; idempotency key on the consumer (ADR-009)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id (the originating aggregate). The Inventory aggregate's own id is derived from reservation_id." },
+    { "name": "correlation_id", "type": "string", "doc": "Saga correlation id; copied on every reply event." },
+    { "name": "reply_to", "type": "string", "doc": "Topic the consumer should publish the reply to (e.g. `inventory.events.reserved` or `inventory.events.failed`)." },
+    { "name": "issued_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC when the Saga emitted the command." },
+    { "name": "order_id", "type": "string", "doc": "Same as aggregate_id; explicit for clarity on the consumer side." },
+    { "name": "items", "type": { "type": "array", "items": { "type": "record", "name": "ReserveItem", "fields": [
+      { "name": "product_id", "type": "string" },
+      { "name": "quantity", "type": "int" }
+    ] } } }
+  ]
+}

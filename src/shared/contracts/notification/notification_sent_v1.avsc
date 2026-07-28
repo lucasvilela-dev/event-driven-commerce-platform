@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "NotificationSent",
+  "namespace": "com.edcp.notification.events",
+  "doc": "Fan-out event published by the Notification Service after a channel dispatch (email/SMS/push). Topic `notification.events.sent` (subject `notification.events.sent-value`). Used for observability and idempotency tracking.",
+  "fields": [
+    { "name": "event_id", "type": "string" },
+    { "name": "aggregate_id", "type": "string", "doc": "Notification id." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "channel", "type": { "type": "enum", "name": "NotificationChannel", "symbols": ["email", "sms", "push", "webhook"] } },
+    { "name": "recipient", "type": "string", "doc": "Channel-specific recipient (email address, phone, device token, etc.)." },
+    { "name": "template", "type": "string", "doc": "Template identifier used to render the message." },
+    { "name": "related_order_id", "type": ["null", "string"], "default": null, "doc": "When the notification was triggered by an Order event, the order id for correlation." },
+    { "name": "status", "type": { "type": "enum", "name": "DeliveryStatus", "symbols": ["sent", "delivered", "failed", "queued"], "default": "sent" } }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "ShippingShipped",
+  "namespace": "com.edcp.shipping.events",
+  "doc": "Reply when a Ship command succeeded. Topic `shipping.events.shipped` (subject `shipping.events.shipped-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string" },
+    { "name": "aggregate_id", "type": "string", "doc": "Shipment id (Shipping aggregate)." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "tracking_code", "type": "string" },
+    { "name": "carrier", "type": "string", "doc": "Carrier name, e.g. `correios`, `dhl`." }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "OrderSagaStepCompleted",
+  "namespace": "com.edcp.order.events",
+  "doc": "Emitted by the OrderSaga orchestrator after each Saga step. Lets us replay the Saga state machine from the Order event stream (ADR-003 + ADR-005).",
+  "fields": [
+    { "name": "event_id", "type": "string", "doc": "UUIDv7." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC." },
+    { "name": "step", "type": { "type": "enum", "name": "SagaStep", "symbols": ["reserve_inventory", "release_reservation", "charge", "refund", "ship", "confirm", "fail"] }, "doc": "The Saga step that just completed (or failed, when state=fail)." },
+    { "name": "state", "type": { "type": "enum", "name": "SagaState", "symbols": ["waiting", "completed", "compensated", "failed"] } },
+    { "name": "success", "type": "boolean" },
+    { "name": "details", "type": ["null", "string"], "default": null, "doc": "Optional human-readable note (e.g. failure reason, dispatch id)." }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "PaymentDeclined",
+  "namespace": "com.edcp.payment.events",
+  "doc": "Reply when a Charge command was declined. Topic `payment.events.declined` (subject `payment.events.declined-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string" },
+    { "name": "aggregate_id", "type": "string", "doc": "Charge id (Payment aggregate)." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "charge_id", "type": "string" },
+    { "name": "reason", "type": { "type": "enum", "name": "DeclineReason", "symbols": ["insufficient_funds", "card_expired", "card_declined", "fraud_suspect", "gateway_error"] } },
+    { "name": "gateway_code", "type": ["null", "string"], "default": null }
+  ]
+}

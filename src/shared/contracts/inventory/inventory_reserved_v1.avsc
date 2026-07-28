@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "InventoryReserved",
+  "namespace": "com.edcp.inventory.events",
+  "doc": "Reply from Inventory when a ReserveInventory command succeeded. Topic `inventory.events.reserved` (subject `inventory.events.reserved-value`). Multiple consumers may subscribe (Order Saga + observability).",
+  "fields": [
+    { "name": "event_id", "type": "string", "doc": "UUIDv7." },
+    { "name": "aggregate_id", "type": "string", "doc": "Reservation id (Inventory aggregate)." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string", "doc": "The originating order; correlation." },
+    { "name": "correlation_id", "type": "string", "doc": "Copied from the ReserveInventory command." },
+    { "name": "items", "type": { "type": "array", "items": { "type": "record", "name": "ReservedItem", "fields": [
+      { "name": "product_id", "type": "string" },
+      { "name": "quantity", "type": "int" }
+    ] } } }
+  ]
+}
