@@ -114,7 +114,7 @@ public class IdentityEndToEndTests : IClassFixture<IdentityWebFactory>
             IssuerSigningKeys = keys.Keys,
         };
 
-        var handler = new JwtSecurityTokenHandler();
+        var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
         var principal = handler.ValidateToken(jwt, validationParameters, out var validatedToken);
 
         var emailClaim = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Email)?.Value;
