@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "PaymentApproved",
+  "namespace": "com.edcp.payment.events",
+  "doc": "Reply when a Charge command was authorized by the payment gateway. Topic `payment.events.approved` (subject `payment.events.approved-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string" },
+    { "name": "aggregate_id", "type": "string", "doc": "Charge id (Payment aggregate)." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "charge_id", "type": "string" },
+    { "name": "amount", "type": { "type": "bytes", "logicalType": "decimal", "precision": 14, "scale": 2 } },
+    { "name": "currency", "type": "string", "default": "BRL" },
+    { "name": "gateway_authorization_code", "type": "string", "doc": "Opaque external authorization reference." }
+  ]
+}

@@ -18,6 +18,40 @@
 
 ---
 
+## 2026-07-27 — Identity approach: hand-rolled JWT issuer (ADR-014)
+
+Context: Phase 2 needed an Identity approach before scaffolding.
+Phase 2 acceptance criteria (`Register`/`Login`/`/jwks`, EF migration
+with `users`/`roles`/`user_roles`, JWT with `sub`/`email`/`roles`,
+15min access + 7d refresh) read like a bespoke service, not an OIDC
+provider.
+
+Decision: hand-rolled JWT issuer. RS256 signing key from PEM file in
+dev (`%USERPROFILE%/.edcp/identity-signing-key.pem`), mounted secret
+in compose. `ITokenIssuer` in `Identity.Application`,
+`SigningKeyProvider` in `Identity.Infrastructure`. Password hashing
+delegates to ASP.NET Identity's `IPasswordHasher<T>` (no
+`IdentityDbContext`). Minimal `/.well-known/openid-configuration`
+(non-conformant — only JWKS URI + issuer). `JwtBearer.Authority`
+pointed at the Identity service for downstream validators.
+
+Alternatives considered: Duende IdentityServer (rejected — feature-set
+mismatch, heavy Duende-internal data model, no OAuth clients in this
+platform), OpenIddict (same mismatch), Auth0 (out-of-scope SaaS
+dependency), HMAC symmetric JWT (rejected — no JWKS, contradicts
+acceptance criteria).
+
+Consequences: schema minimal and explicit; Clean Architecture layering
+exercised end-to-end; full control over key rotation. Trade-off: no
+real OIDC `/authorize` flow — revisit with a superseding ADR if a SPA
+with PKCE ever appears. Refresh-token rotation deferred to a later
+phase.
+
+Follow-up: ADR-014 written and accepted; ADR index updated; scaffold
+the 4 Clean Architecture projects as Phase 2 step 2.
+
+---
+
 ## 2026-07-26 — Adopt native distributed-tracing propagators (ADR-015, amends ADR-010)
 
 Context: the initial Phase 1 implementation of ADR-010 hand-rolled a

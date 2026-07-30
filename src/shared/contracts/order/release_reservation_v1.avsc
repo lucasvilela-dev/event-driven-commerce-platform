@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "ReleaseReservation",
+  "namespace": "com.edcp.order.commands",
+  "doc": "Compensation command from the Order Saga to release a previously reserved inventory block. Topic `order.commands.release-reservation` (subject `order.commands.release-reservation-value`).",
+  "fields": [
+    { "name": "command_id", "type": "string", "doc": "UUIDv7; idempotency key." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id." },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "reply_to", "type": "string", "default": "inventory.events.released" },
+    { "name": "issued_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "reservation_id", "type": "string", "doc": "The reservation to release (previously granted by InventoryReserved)." },
+    { "name": "reason", "type": "string", "default": "saga_compensation" }
+  ]
+}

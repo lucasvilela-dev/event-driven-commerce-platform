@@ -1,0 +1,17 @@
+{
+  "type": "record",
+  "name": "Charge",
+  "namespace": "com.edcp.payment.commands",
+  "doc": "Command from the Order Saga to the Payment Service to charge a payment method. Topic `payment.commands.charge` (subject `payment.commands.charge-value`).",
+  "fields": [
+    { "name": "command_id", "type": "string", "doc": "UUIDv7; idempotency key (also used as charge_id)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id (originating aggregate)." },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "reply_to", "type": "string", "default": "payment.events.approved" },
+    { "name": "issued_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "amount", "type": { "type": "bytes", "logicalType": "decimal", "precision": 14, "scale": 2 } },
+    { "name": "currency", "type": "string", "default": "BRL" },
+    { "name": "payment_method_token", "type": "string", "doc": "Opaque token resolved by the Payment Service against its payment gateway." }
+  ]
+}

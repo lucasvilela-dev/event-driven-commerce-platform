@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "OrderCreated",
+  "namespace": "com.edcp.order.events",
+  "doc": "Published when a new Order aggregate is created. Lives on topic `order.events` (subject `order.events-value`) as part of the Order event stream. Producer: Order Service (via Outbox).",
+  "fields": [
+    { "name": "event_id", "type": "string", "doc": "UUIDv7, globally unique event identifier; used by consumers for idempotency (ADR-009)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id, identical for every event of the same Order aggregate." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC when the event was appended to the stream." },
+    { "name": "customer_id", "type": "string", "doc": "Subject of the buyer; identity claim from JWT issued by Identity Service." },
+    { "name": "items", "type": { "type": "array", "items": { "type": "record", "name": "OrderItem", "fields": [
+      { "name": "product_id", "type": "string" },
+      { "name": "quantity", "type": "int" },
+      { "name": "unit_price", "type": { "type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2 } }
+    ] } } },
+    { "name": "total_amount", "type": { "type": "bytes", "logicalType": "decimal", "precision": 14, "scale": 2 } },
+    { "name": "currency", "type": "string", "default": "BRL" }
+  ]
+}

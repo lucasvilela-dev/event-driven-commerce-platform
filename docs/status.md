@@ -9,9 +9,11 @@
 
 **Phase 2 — Identity service** (`[next]` in the roadmap, after Phase 1 done).
 
-Start date: not started yet.
-Active step: — (decide IdentityServer vs custom JWT in a mini-ADR,
-then scaffold the 4 Clean Architecture projects).
+Start date: 2026-07-27.
+Active step: Phase 2 step 3 committed on `feat/identity-scaffold`
+and pushed; PR pending `gh auth login` (Docker Desktop must be
+running for the Testcontainers integration test to validate locally
+before merge).
 
 ## What's done
 
@@ -64,33 +66,132 @@ then scaffold the 4 Clean Architecture projects).
 
 ## Next 3 concrete steps
 
-1. **Decide Identity approach** — `Duende IdentityServer` (full OIDC +
-   JWKS out of the box, more impressive but heavier) vs a lightweight
-   hand-rolled JWT issuer (smaller surface, more code to test). Write the
-   decision as a mini-ADR (ADR-014 perhaps) and add a row to the ADR index.
-2. **Scaffold the Identity Clean Architecture projects** under
-   `src/services/identity/` — `Identity.Domain`, `Identity.Application`,
-   `Identity.Infrastructure`, `Identity.Api` + a `.sln` + test projects,
-   referencing `OpenCode.TraceContext` from `src/shared/observability/dotnet/`.
-3. **Implement `Register` + `Login` + `/jwks`** (Phase 2 acceptance
-   criteria) with EF Core (Postgres `identity` DB) and Serilog → Seq;
-   backstop with an integration test on Testcontainers.
+1. **Run the `Identity.IntegrationTests` Testcontainers suite locally**
+   (start Docker Desktop on the dev machine, then
+   `dotnet test --filter IntegrationTests`). Confirm register→login
+   → JWT-validated-against-`/.well-known/jwks` is green; fix any
+   EOF/runtime surprises from the live Postgres + JWT validation
+   step before opening the PR.
+2. **Authenticate `gh` and open the PR** `feat/identity-scaffold →
+   develop` (run `& "$env:LOCALAPPDATA\Programs\gh\gh.exe" auth login`
+   once in a terminal with browser access; I'll then call
+   `gh pr create --base develop --title "feat(identity): scaffold +
+   register/login/jwks (Phase 2, ADR-014)"`). Body to include the
+   acceptance-criteria checklist from `docs/roadmap.md` Phase 2.
+3. **Write `docs/runbook/identity.md`** — local run (HTTPS
+   `https://localhost:5001`, env vars: `Jwt:Issuer`,
+   `Jwt:SigningKeyPath`, `ConnectionStrings:Identity`, `Seq` URL),
+   signing-key generation snippet, JWKS rotation procedure, and the
+   "no /refresh in Phase 2 — refresh JWT issuance only" caveat.
+   Closes Phase 2; then move to Phase 3 (Product catalog).
+2. **Add `/.well-known/openid-configuration` + `/.well-known/jwks`
+   controllers** in `Identity.Api` returning the minimal discovery doc
+   and the RSA public key JWK (RFC 7517 + RFC 7638 `kid`).
+3. **Create the EF Core migration** (`dotnet ef migrations add
+   InitialIdentity`) producing `users`/`roles`/`user_roles`, plus a
+   seed of the `customer`/`admin` roles; add a Testcontainers-based
+   integration test that runs register → login → JWT signature
+   validation against `/jwks`.
 
 ## Blockers
 
-None.
+- **Docker Desktop is not running** on the dev machine — the
+  `Identity.IntegrationTests` Testcontainers suite (register →
+  login → JWT-validation-against-`/.well-known/jwks`) cannot execute
+  locally until Docker Desktop is started. Unit tests pass (6/6).
+- **`gh` CLI not authenticated** — branch `feat/identity-scaffold`
+  was pushed; PR creation pending `gh auth login` (or manual creation
+  via the URL GitHub returned on push).
 
 ## Open questions
 
-- Whether Identity should use **Duende IdentityServer** (full OIDC) or a
-  lightweight hand-rolled JWT issuer. Duende is more impressive for
-  portfolio but heavier; decide in Phase 2 with a mini-ADR.
 - Whether Order's Event Sourcing should use **Marten** or a hand-rolled
   append-only store. Defer to Phase 4; spike both.
 
 ## Decisions made this session
 
-- Adopted **roadmap-driven development** with `docs/roadmap.md` (plan) +
+- **Scope of Phase 2 refresh tokens = issuance only** (option B).
+  `/login` returns access + refresh JWTs (15min / 7d). The
+  `/api/identity/refresh` endpoint and rotation (the
+  `refresh_tokens` table with `revoked_at`/`replaced_by`/`family_id`
+  and reuse-detection) are **deferred to a later phase** — Phase 2
+  acceptance criteria only require issuance. Deferred work is tracked
+  as a future mini-phase or stretch item; revisit after Phase 8
+  (Gateway) when the auth surface is exercised end-to-end.
+
+- **Identity approach = hand-rolled JWT issuer** (ADR-014, accepted
+  2026-07-27). Duende IdentityServer rejected as feature-set mismatch
+  (no `/authorize` code flow, no scopes, no introspection needed) and its
+  own data model conflicts with the explicit `users`/`roles`/`user_roles`
+  Phase 2 schema. Hand-rolled exercises more Clean Architecture flow
+  and gives full control over JWKS rotation. RSA PEM key in dev, mounted
+  secret in compose; `ITokenIssuer` abstraction in Application, a
+  `SigningKeyProvider` in Infrastructure. Discovery document at
+  `/.well-known/openid-configuration` is minimal and non-conformant
+  (no `authorization_endpoint`, etc.) — it exists only to bootstrap
+  the JWKS URI and issuer for downstream validators.
+
+- **Phase 2 step 3 (Identity service implementation) landed** on
+  `feat/identity-scaffold`:
+  - `IUserRepository`/`IRoleRepository` implementations over
+    `IdentityDbContext` (eager-load `User.Roles.Role`).
+  - MediatR handlers: `RegisterHandler` (normalize email → reject
+    duplicate → fetch `customer` role → hash pw via
+    `IPasswordHasher<ApplicationUser>` → insert → save) and
+    `LoginHandler` (lookup → verify → bump `LastLoginAt` → issue
+    `TokenPair` via `ITokenIssuer`).
+  - `IdentityController` (`POST /api/identity/register` + `/login`)
+    with `DuplicateEmailException`→409, `RoleNotFoundException`→500,
+    `InvalidCredentialsException`→401 mapping.
+  - `DiscoveryController` (`/.well-known/openid-configuration` —
+    minimal non-conformant doc: `issuer`, `jwks_uri`,
+    `token_endpoint`, `id_token_signing_alg_values_supported=["RS256"]`,
+    `subject_types_supported=["public"]`).
+  - `JwksController` (`/.well-known/jwks` — single RSA JWK with
+    `kid` = RFC 7638 SHA-1 thumbprint of the SPKI, `n`+`e`
+    base64url-encoded).
+  - `SigningKeyProvider` upgraded to compute RFC 7638 `kid` from the
+    RSA public key (no more `Jwt:KeyId` config string). ADR-014
+    captured this; `appsettings.json` + `JwtIssuerOptions` cleaned.
+  - EF Core migration `InitialIdentity` (via `dotnet ef migrations
+    add`): creates `users`/`roles`/`user_roles` tables with FKs +
+    indexes + `HasData` seed of `customer`/`admin` roles. DbContext
+    wired with `MigrationsAssembly(typeof(IdentityDbContext).Assembly)`.
+  - Unit tests (6, xUnit/NSubstitute/FluentAssertions): RegisterHandler
+    success + duplicate-email + missing-role; LoginHandler unknown +
+    wrong-password + happy-path issues tokens and persists.
+    `Identity.Api.Tests` builds and 6/6 pass.
+  - Testcontainers integration test (`IdentityEndToEndTests`,
+    `IdentityWebFactory: WebApplicationFactory<Program> +
+    IAsyncLifetime` with a `postgres:16-alpine` container):
+    discovery doc, JWKS single RSA key, register→duplicate-email→login
+    round-trip with JWT signature **validated against the live
+    `/.well-known/jwks`** and `sub`/`email`/`role=customer` claims
+    asserted, wrong-password 401, unknown-user 401. **Skipped locally
+    because Docker Desktop is not running — to run, start Docker
+    Desktop and `dotnet test --filter IntegrationTests`.**
+  - `Identity.Api.Tests` `SmokeTests.cs` removed (replaced by real
+    handler tests).
+
+- **Identity scaffold landed** under `src/services/identity/`: 4 Clean
+  Architecture projects + `Identity.Api.Tests` (unit) +
+  `tests/Identity.IntegrationTests` + `Identity.sln`. EF Core 9 +
+  Npgsql 9 + MediatR 12.5 + Serilog 4 + `System.IdentityModel.Tokens.Jwt`
+  8.3 + `Microsoft.Extensions.Identity.Core` 9 (IPasswordHasher only —
+  no `IdentityDbContext`). Api references `OpenCode.TraceContext`
+  (per ADR-015) and calls `TraceContext.AlwaysSample()` at startup;
+  Serilog writes to Seq with `ServiceName=identity` +
+  `.WithActivityTrace()`. Dev issuer/HTTPS port pinned at
+  `https://localhost:5001` (matches `Jwt:Issuer`). Placeholders
+  compile-clean: entities (`ApplicationUser`/`Role`/`UserRole`),
+  EF configs (tables `users`/`roles`/`user_roles`), `IdentityDbContext`,
+  `TokenIssuer`, `PasswordHasherAdapter`, `SigningKeyProvider`,
+  `UnitOfWork`, `IUserRepository`/`IRoleRepository`/`IUnitOfWork`
+  interfaces, `RegisterCommand`/`LoginCommand` shapes. Identity
+  `AGENTS.md` rewritten to reflect ADR-014 (no more Duende conditional).
+  **No handlers/controllers wired yet — that's step 3.**
+
+- **Scope of Phase 2 refresh tokens = issuance only** (option B).
   `docs/status.md` (state) + `docs/decisions-log.md` (tactical).
 - Adopted **.NET 10** as the target framework (was .NET 8 in initial draft).
 - Modelled `order.events` as a single Avro union subject

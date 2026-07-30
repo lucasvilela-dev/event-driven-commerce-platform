@@ -1,0 +1,19 @@
+{
+  "type": "record",
+  "name": "InventoryFailed",
+  "namespace": "com.edcp.inventory.events",
+  "doc": "Reply when a ReserveInventory command failed (e.g. insufficient stock). Topic `inventory.events.failed` (subject `inventory.events.failed-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string" },
+    { "name": "aggregate_id", "type": "string", "doc": "Reservation attempt id (may be ephemeral)." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "reason", "type": { "type": "enum", "name": "FailureReason", "symbols": ["out_of_stock", "product_not_found", "concurrent_reservation", "internal_error"] } },
+    { "name": "failed_items", "type": { "type": "array", "items": { "type": "record", "name": "FailedItem", "fields": [
+      { "name": "product_id", "type": "string" },
+      { "name": "requested_quantity", "type": "int" },
+      { "name": "available_quantity", "type": "int", "default": 0 }
+    ] } } }
+  ]
+}

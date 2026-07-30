@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "ShippingFailed",
+  "namespace": "com.edcp.shipping.events",
+  "doc": "Reply when a Ship command failed (e.g. undeliverable address, carrier outage). Topic `shipping.events.failed` (subject `shipping.events.failed-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string" },
+    { "name": "aggregate_id", "type": "string", "doc": "Shipment id." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "reason", "type": { "type": "enum", "name": "ShippingFailureReason", "symbols": ["address_undeliverable", "carrier_unavailable", "region_unsupported", "internal_error"] } },
+    { "name": "details", "type": ["null", "string"], "default": null }
+  ]
+}

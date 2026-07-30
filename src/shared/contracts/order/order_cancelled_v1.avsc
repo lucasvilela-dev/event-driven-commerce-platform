@@ -1,0 +1,13 @@
+{
+  "type": "record",
+  "name": "OrderCancelled",
+  "namespace": "com.edcp.order.events",
+  "doc": "Published when an Order is cancelled (user-initiated or as a Saga compensation). Lives on `order.events` (subject `order.events-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string", "doc": "UUIDv7." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC." },
+    { "name": "reason", "type": "string", "doc": "Free-text cancellation reason; machine-readable codes will be added as an enum default later (backward compatible)." },
+    { "name": "initiated_by", "type": { "type": "enum", "name": "CancellationTrigger", "symbols": ["customer", "saga_compensation", "support", "system"], "default": "system" } }
+  ]
+}

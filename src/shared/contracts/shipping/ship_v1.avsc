@@ -1,0 +1,23 @@
+{
+  "type": "record",
+  "name": "Ship",
+  "namespace": "com.edcp.shipping.commands",
+  "doc": "Command from the Order Saga to the Shipping Service to dispatch an order. Topic `shipping.commands.ship` (subject `shipping.commands.ship-value`).",
+  "fields": [
+    { "name": "command_id", "type": "string", "doc": "UUIDv7; idempotency key (also shipment id)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id." },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "reply_to", "type": "string", "default": "shipping.events.shipped" },
+    { "name": "issued_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "shipping_method", "type": { "type": "enum", "name": "ShippingMethod", "symbols": ["standard", "express", "pickup", "same_day"], "default": "standard" } },
+    { "name": "address", "type": { "type": "record", "name": "Address", "fields": [
+      { "name": "line1", "type": "string" },
+      { "name": "line2", "type": ["null", "string"], "default": null },
+      { "name": "city", "type": "string" },
+      { "name": "state", "type": "string" },
+      { "name": "postal_code", "type": "string" },
+      { "name": "country", "type": "string", "default": "BR" }
+    ] } }
+  ]
+}

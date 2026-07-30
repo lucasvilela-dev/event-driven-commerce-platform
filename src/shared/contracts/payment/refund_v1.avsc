@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "Refund",
+  "namespace": "com.edcp.payment.commands",
+  "doc": "Compensation command from the Order Saga to refund a previously authorized charge. Topic `payment.commands.refund` (subject `payment.commands.refund-value`).",
+  "fields": [
+    { "name": "command_id", "type": "string", "doc": "UUIDv7; idempotency key (also used as refund_id)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Order id." },
+    { "name": "correlation_id", "type": "string" },
+    { "name": "reply_to", "type": "string", "default": "payment.events.refunded" },
+    { "name": "issued_at", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "order_id", "type": "string" },
+    { "name": "charge_id", "type": "string", "doc": "The original charge to refund (from the matching PaymentApproved event)." },
+    { "name": "amount", "type": { "type": "bytes", "logicalType": "decimal", "precision": 14, "scale": 2 } },
+    { "name": "currency", "type": "string", "default": "BRL" },
+    { "name": "reason", "type": "string", "default": "saga_compensation" }
+  ]
+}

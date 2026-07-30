@@ -1,0 +1,49 @@
+[
+  {
+    "type": "record",
+    "name": "OrderCreated",
+    "namespace": "com.edcp.order.events",
+    "doc": "Published when a new Order aggregate is created. Lives on topic `order.events` (subject `order.events-value`) as part of the Order event stream. Producer: Order Service (via Outbox).",
+    "fields": [
+      { "name": "event_id", "type": "string", "doc": "UUIDv7, globally unique event identifier; used by consumers for idempotency (ADR-009)." },
+      { "name": "aggregate_id", "type": "string", "doc": "Order id, identical for every event of the same Order aggregate." },
+      { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC when the event was appended to the stream." },
+      { "name": "customer_id", "type": "string", "doc": "Subject of the buyer; identity claim from JWT issued by Identity Service." },
+      { "name": "items", "type": { "type": "array", "items": { "type": "record", "name": "OrderItem", "fields": [
+        { "name": "product_id", "type": "string" },
+        { "name": "quantity", "type": "int" },
+        { "name": "unit_price", "type": { "type": "bytes", "logicalType": "decimal", "precision": 12, "scale": 2 } }
+      ] } } },
+      { "name": "total_amount", "type": { "type": "bytes", "logicalType": "decimal", "precision": 14, "scale": 2 } },
+      { "name": "currency", "type": "string", "default": "BRL" }
+    ]
+  },
+  {
+    "type": "record",
+    "name": "OrderCancelled",
+    "namespace": "com.edcp.order.events",
+    "doc": "Published when an Order is cancelled (user-initiated or as a Saga compensation). Lives on `order.events` (subject `order.events-value`).",
+    "fields": [
+      { "name": "event_id", "type": "string", "doc": "UUIDv7." },
+      { "name": "aggregate_id", "type": "string", "doc": "Order id." },
+      { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC." },
+      { "name": "reason", "type": "string", "doc": "Free-text cancellation reason; machine-readable codes will be added as an enum default later (backward compatible)." },
+      { "name": "initiated_by", "type": { "type": "enum", "name": "CancellationTrigger", "symbols": ["customer", "saga_compensation", "support", "system"], "default": "system" } }
+    ]
+  },
+  {
+    "type": "record",
+    "name": "OrderSagaStepCompleted",
+    "namespace": "com.edcp.order.events",
+    "doc": "Emitted by the OrderSaga orchestrator after each Saga step. Lets us replay the Saga state machine from the Order event stream (ADR-003 + ADR-005).",
+    "fields": [
+      { "name": "event_id", "type": "string", "doc": "UUIDv7." },
+      { "name": "aggregate_id", "type": "string", "doc": "Order id." },
+      { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC." },
+      { "name": "step", "type": { "type": "enum", "name": "SagaStep", "symbols": ["reserve_inventory", "release_reservation", "charge", "refund", "ship", "confirm", "fail"] }, "doc": "The Saga step that just completed (or failed, when state=fail)." },
+      { "name": "state", "type": { "type": "enum", "name": "SagaState", "symbols": ["waiting", "completed", "compensated", "failed"] } },
+      { "name": "success", "type": "boolean" },
+      { "name": "details", "type": ["null", "string"], "default": null, "doc": "Optional human-readable note (e.g. failure reason, dispatch id)." }
+    ]
+  }
+]
