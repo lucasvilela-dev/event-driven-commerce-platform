@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "ProductActivated",
+  "namespace": "com.edcp.product.events",
+  "doc": "Published when a Product is activated via the ActivateProduct command. Topic `product.events.activated` (subject `product.events.activated-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string", "doc": "UUIDv7, idempotency key (ADR-009)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Product id." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } }
+  ]
+}

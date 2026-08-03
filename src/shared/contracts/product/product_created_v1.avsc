@@ -1,0 +1,20 @@
+{
+  "type": "record",
+  "name": "ProductCreated",
+  "namespace": "com.edcp.product.events",
+  "doc": "Published when a new Product aggregate is created via the CreateProduct command. Topic `product.events.created` (subject `product.events.created-value`). Producer: Product Service (via Outbox). Consumer(s): product projection (self), notification (later phases).",
+  "fields": [
+    { "name": "event_id", "type": "string", "doc": "UUIDv7, globally unique event identifier; idempotency key for consumers (ADR-009)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Product id, identical for every event of the same Product aggregate." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" }, "doc": "Epoch millis UTC when the event was appended to the stream." },
+    { "name": "name", "type": "string", "doc": "Product display name." },
+    { "name": "description", "type": "string", "default": "", "doc": "Long-form description; empty string when omitted." },
+    { "name": "sku", "type": "string", "doc": "Stock-keeping unit; unique across the catalog." },
+    { "name": "price", "type": { "type": "bytes", "logicalType": "decimal", "precision": 14, "scale": 2 }, "doc": "Unit price (decimal, precision 14, scale 2 — fractional cents allowed)." },
+    { "name": "currency", "type": "string", "default": "BRL", "doc": "ISO 4217 currency code." },
+    { "name": "category", "type": "string", "default": "", "doc": "Free-form category slug (e.g. 'electronics')." },
+    { "name": "featured", "type": "boolean", "default": false, "doc": "Whether the product appears on the featured listing." },
+    { "name": "priority", "type": "int", "default": 0, "doc": "Sort priority inside the featured sorted set (ADR-006). Higher = earlier." },
+    { "name": "active", "type": "boolean", "default": true, "doc": "Initial active flag (CreateProduct always starts active)." }
+  ]
+}
