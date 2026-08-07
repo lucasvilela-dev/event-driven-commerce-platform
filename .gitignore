@@ -7,6 +7,10 @@ Thumbs.db
 .vscode/
 *.user
 *.suo
+# JetBrains Rider / ReSharper personal settings (team-shared is *.DotSettings)
+*.DotSettings.user
+*.sln.DotSettings.user
+**/obj/rider.*.info
 
 # =============================================================================
 # .NET

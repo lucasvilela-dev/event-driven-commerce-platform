@@ -18,6 +18,66 @@
 
 ---
 
+## 2026-08-07 — Use `.slnx` for new service solutions; ignore `.DotSettings.user`
+
+Context: two repo-hygiene items surfaced while reviewing the Product
+service. (1) `Product.sln.DotSettings.user` was present on disk — it's
+a JetBrains Rider **per-user** settings file (machine/AppData-cache
+paths inside) and should never be tracked; only the team-shared
+`Product.sln.DotSettings` belongs in source control. The existing root
+`.gitignore` already had a broad `*.user` glob which technically
+covered it, but we wanted the more explicit Rider/ReSharper patterns
+(`*.sln.DotSettings.user`, `*.DotSettings.user`, `**/obj/rider.*.info`)
+so the intent is self-documenting. (2) The repo currently uses the
+classic `.sln` format for every service solution; .NET 10 shipped a
+new XML-based `.slnx` solution format that is diff-friendly,
+mergeable, and free of GUID/configuration-platform boilerplate —
+better suited for a polyrepo-style monorepo where each service has
+its own solution.
+
+Decision:
+- Extend the existing root `.gitignore` with explicit JetBrains
+  Rider / ReSharper patterns: `*.DotSettings.user`,
+  `*.sln.DotSettings.user`, `**/obj/rider.*.info`. The existing broad
+  `*.user` stays as a backstop. `Product.sln.DotSettings.user` is
+  untracked (it was never committed) — confirm it stays so.
+- Adopt `.slnx` as the convention for **any new service solution**
+  scaffolded from now on (Order, Payment, Inventory, Shipping,
+  Notification — none exist yet). Use `dotnet new slnx` to create it.
+- Leave the existing service solutions (`Identity.sln`, `Product.sln`)
+  on the legacy `.sln` format to avoid churn; migrate them later with
+  `dotnet sln migrate` only if there's a compelling reason (e.g. a
+  tricky merge conflict on the binary-ish `.sln`).
+- Both formats coexist fine in the IDE/tooling — no forced migration.
+
+Alternatives considered:
+- Migrate `Identity.sln` and `Product.sln` to `.slnx` right now for
+  consistency — rejected: pure churn, no functional gain this session,
+  and touches working solutions we just validated.
+- Leave the `.gitignore` as the single broad `*.user` glob — rejected:
+  the explicit Rider patterns make the intent legible to future agents
+  and reviewers.
+- Make `.slnx` mandatory for ALL solutions including existing ones —
+  rejected: the legacy `.sln` works and migration is optional per
+  Microsoft's own guidance.
+
+Consequences:
+- `Product.sln.DotSettings.user` remains untracked (it never was);
+  the explicit ignore makes the rule future-proof against broad-glob
+  edits.
+- Future agents scaffolding a new service must use `dotnet new slnx`
+  (not `dotnet new sln`), and add projects with the same
+  `dotnet sln add <proj.csproj>` command — the CLI detects the extension.
+- The monorepo now has a documented convention: new solutions = `.slnx`,
+  existing solutions = `.sln` until explicitly migrated.
+- IDE support is verified for VS 2022 17.14+, Rider 2024.3+,
+  VS Code C# Dev Kit — all current at project-start time.
+
+Follow-up: document the `.slnx` choice in each new service's AGENTS.md
+when it's scaffolded.
+
+---
+
 ## 2026-08-03 — Phase 2 Identity feature-complete; runbook + AGENTS kid-note fix
 
 Context: Phase 2 step 3 had landed on `feat/identity-scaffold` and was
