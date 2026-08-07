@@ -82,6 +82,10 @@ Multiple event types live on it under a single schema-registry subject:
 | `shipping/shipping_shipped_v1.avsc`               | `shipping.events.shipped`          | `shipping.events.shipped-value`        | Shipping Service   | Order Saga, Notification                     |
 | `shipping/shipping_failed_v1.avsc`                | `shipping.events.failed`           | `shipping.events.failed-value`         | Shipping Service   | Order Saga                                   |
 | `notification/notification_sent_v1.avsc`          | `notification.events.sent`         | `notification.events.sent-value`       | Notification Service | observability                               |
+| `product/product_created_v1.avsc`                | `product.events.created`           | `product.events.created-value`        | Product Service    | Product projection (self), Notification (later) |
+| `product/product_price_updated_v1.avsc`          | `product.events.price-updated`     | `product.events.price-updated-value`  | Product Service    | Product projection (self)                  |
+| `product/product_activated_v1.avsc`              | `product.events.activated`         | `product.events.activated-value`      | Product Service    | Product projection (self)                  |
+| `product/product_deactivated_v1.avsc`           | `product.events.deactivated`        | `product.events.deactivated-value`    | Product Service    | Product projection (self)                  |
 
 ### Commands
 

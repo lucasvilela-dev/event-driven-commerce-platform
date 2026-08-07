@@ -90,7 +90,12 @@ registered with `MigrationsAssembly = typeof(IdentityDbContext).Assembly`).
   [System.IO.File]::WriteAllText("$env:USERPROFILE\.edcp\identity-signing-key.pem", $rsa.ExportRSAPrivateKeyPem())
   ```
   then point `Jwt:SigningKeyPath` at it (user-secrets or env var).
-- The `kid` advertised in `/jwks` is `Jwt:KeyId` (default
-  `identity-signing-key-v1`). Rotating keys = bump `KeyId` and serve
-  both old and new in `/jwks` for the overlap window (out of Phase 2
-  scope; documented in ADR-014 as a future enhancement).
+- The `kid` advertised in `/jwks` is the **RFC 7638 SHA-1 thumbprint**
+  of the RSA `SubjectPublicKeyInfo`, computed by
+  `SigningKeyProvider.ComputeRfc7638Kid` — not a hand-set config string.
+  (A static `Jwt:KeyId` was considered in the early ADR-014 draft and
+  superseded during Phase 2 step 3; the config key is gone.)
+- Rotating keys = add a second `(RsaSecurityKey, kid)` pair to the
+  provider, serve both in `/jwks` for the overlap window (≥ one refresh
+  lifetime, i.e. ≥ 7d), then drop the old key (out of Phase 2 scope;
+  procedure in `docs/runbook/identity.md`).

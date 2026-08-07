@@ -18,6 +18,220 @@
 
 ---
 
+## 2026-08-07 — Use `.slnx` for new service solutions; ignore `.DotSettings.user`
+
+Context: two repo-hygiene items surfaced while reviewing the Product
+service. (1) `Product.sln.DotSettings.user` was present on disk — it's
+a JetBrains Rider **per-user** settings file (machine/AppData-cache
+paths inside) and should never be tracked; only the team-shared
+`Product.sln.DotSettings` belongs in source control. The existing root
+`.gitignore` already had a broad `*.user` glob which technically
+covered it, but we wanted the more explicit Rider/ReSharper patterns
+(`*.sln.DotSettings.user`, `*.DotSettings.user`, `**/obj/rider.*.info`)
+so the intent is self-documenting. (2) The repo currently uses the
+classic `.sln` format for every service solution; .NET 10 shipped a
+new XML-based `.slnx` solution format that is diff-friendly,
+mergeable, and free of GUID/configuration-platform boilerplate —
+better suited for a polyrepo-style monorepo where each service has
+its own solution.
+
+Decision:
+- Extend the existing root `.gitignore` with explicit JetBrains
+  Rider / ReSharper patterns: `*.DotSettings.user`,
+  `*.sln.DotSettings.user`, `**/obj/rider.*.info`. The existing broad
+  `*.user` stays as a backstop. `Product.sln.DotSettings.user` is
+  untracked (it was never committed) — confirm it stays so.
+- Adopt `.slnx` as the convention for **any new service solution**
+  scaffolded from now on (Order, Payment, Inventory, Shipping,
+  Notification — none exist yet). Use `dotnet new slnx` to create it.
+- Leave the existing service solutions (`Identity.sln`, `Product.sln`)
+  on the legacy `.sln` format to avoid churn; migrate them later with
+  `dotnet sln migrate` only if there's a compelling reason (e.g. a
+  tricky merge conflict on the binary-ish `.sln`).
+- Both formats coexist fine in the IDE/tooling — no forced migration.
+
+Alternatives considered:
+- Migrate `Identity.sln` and `Product.sln` to `.slnx` right now for
+  consistency — rejected: pure churn, no functional gain this session,
+  and touches working solutions we just validated.
+- Leave the `.gitignore` as the single broad `*.user` glob — rejected:
+  the explicit Rider patterns make the intent legible to future agents
+  and reviewers.
+- Make `.slnx` mandatory for ALL solutions including existing ones —
+  rejected: the legacy `.sln` works and migration is optional per
+  Microsoft's own guidance.
+
+Consequences:
+- `Product.sln.DotSettings.user` remains untracked (it never was);
+  the explicit ignore makes the rule future-proof against broad-glob
+  edits.
+- Future agents scaffolding a new service must use `dotnet new slnx`
+  (not `dotnet new sln`), and add projects with the same
+  `dotnet sln add <proj.csproj>` command — the CLI detects the extension.
+- The monorepo now has a documented convention: new solutions = `.slnx`,
+  existing solutions = `.sln` until explicitly migrated.
+- IDE support is verified for VS 2022 17.14+, Rider 2024.3+,
+  VS Code C# Dev Kit — all current at project-start time.
+
+Follow-up: document the `.slnx` choice in each new service's AGENTS.md
+when it's scaffolded.
+
+---
+
+## 2026-08-03 — Phase 2 Identity feature-complete; runbook + AGENTS kid-note fix
+
+Context: Phase 2 step 3 had landed on `feat/identity-scaffold` and was
+pushed, but the Testcontainers integration suite had never run locally
+(Docker Desktop was down at the previous session's end) and the
+`docs/runbook/identity.md` deliverable for Phase 2 was still missing.
+A stale `kid` description in `src/services/identity/AGENTS.md` was
+also noticed (it referenced a static `Jwt:KeyId` config that no longer
+exists — the `kid` is the RFC 7638 SPKI SHA-1 thumbprint computed by
+`SigningKeyProvider`).
+
+Decision: ran the full Testcontainers suite locally (Docker Desktop up,
+`postgres:16-alpine`) — 5/5 integration + 6/6 unit green; wrote
+`docs/runbook/identity.md` (env vars, signing-key generation, JWKS
+rotation procedure, downstream `AddJwtBearer` validation pattern, the
+deferred `/refresh` caveat); corrected the AGENTS.md `kid` note to
+match the code; left ADR-014 unchanged as an immutable record.
+
+Alternatives considered: defer the runbook until the PR merge (rejected
+— Phase 2 acceptance criteria list it as a deliverable); edit ADR-014
+in place (rejected — ADRs are immutable; the divergence is captured
+in `status.md` and runbook).
+
+Consequences: Phase 2 is feature-complete; only the deliverable PR
+(`gh auth login` then `gh pr create`) remains before moving to Phase 3
+(Product CQRS scaffold). Future agents reading `AGENTS.md` get the
+correct `kid` derivation.
+
+Follow-up: open the PR `feat/identity-scaffold → develop`; after merge
+move Phase 2 to "What's done" in `status.md` and begin Phase 3
+Product scaffold.
+
+---
+
+## 2026-08-03 — Product C# aggregate root renamed to `ProductAggregate`
+
+Context: Phase 3 Product scaffold hit a C# name collision — the
+project root namespace `Product.X` (per `<RootNamespace>Product.X</RootNamespace>`)
+makes the bare name `Product` resolve to the *namespace* `Product`,
+not the entity class `Product.Domain.Entities.Product`. References to
+the unqualified entity type failed with CS0118 ("Product is a
+namespace, but is used as a type"). Tried a project-level
+`<Using Include="..." Alias="Product" />` — generated CS0576 (alias
+conflicts with the global namespace `Product`).
+
+Decision: rename the C# aggregate-root class `Product` →
+`ProductAggregate` (`src/services/product/Product.Domain/Entities/
+Product.cs`). The Avro records keep their canonical names
+(`ProductCreated`, `ProductPriceUpdated`, `ProductActivated`,
+`ProductDeactivated`), and prose / ADRs keep "the Product aggregate"
+— the rename is C#-internal. Same trick Identity used with
+`ApplicationUser` vs the `Identity.X` namespace root.
+
+Alternatives considered:
+- Project-level `<Using Alias="Product">` — rejected (CS0576 alias
+  vs namespace conflict at global scope).
+- Rename the root namespace to `Edcp.Product.X` — rejected: the
+  sub-namespace segment `Product` still collides with the entity
+  bare name in any `using Edcp.Product.Domain.Entities;` consumer.
+- Use a fully-qualified `Product.Domain.Entities.Product` everywhere
+  — rejected: noisy, easy to forget, breaks with `using`.
+
+Consequences:
+- Code reads `ProductAggregate.CreateNew` / `ProductAggregate.UpdatePrice`.
+- DbSet stays `Products` and table stays `products`; only the C#
+  class name changes. Avro / Kafka topics unaffected.
+- The next aggregate root that collides with a namespace segment
+  (e.g. Order, Payment, Inventory) will follow the same rename
+  pattern; document the precedent in the service AGENTS.md.
+
+Follow-up: documented in `src/services/product/AGENTS.md` "Aggregate
+root class name" section.
+
+---
+
+## 2026-08-03 — EF migrations placed at `Persistence/Migrations/` via CLI flags
+
+Context: `dotnet ef migrations add InitialProduct` (without flags)
+placed the migration at `<ProjectRoot>/Migrations/` with namespace
+`Product.Infrastructure.Migrations`. Identity's migrations live at
+`Identity.Infrastructure/Persistence/Migrations/` with namespace
+`Identity.Infrastructure.Persistence.Migrations` (matching the
+DbContext namespace), giving a coherent folder layout.
+
+Decision: regenerate with explicit
+`--namespace Product.Infrastructure.Persistence.Migrations
+--output-dir Persistence/Migrations`, matching Identity exactly.
+Apply the same flags when scaffolding EF migrations for any service
+whose DbContext does NOT live at the project root folder.
+
+Alternatives considered:
+- Accept the default `Migrations/` at project root for Product and
+  accept the folder drift between services — rejected (one-folder
+  drift is annoying in code review and Docker/CLI commands).
+- Change `<RootNamespace>` to include `Persistence` — rejected:
+  changes every namespace in the project for EF migration cosmetic
+  convenience; net negative.
+
+Follow-up: documented in the service `AGENTS.md` EF Core paragraphs.
+
+---
+
+## 2026-08-03 — Product events: 1:1 file↔topic↔subject (NOT a union)
+
+Context: Phase 3 produces the first Product Kafka events. ADR-005
+establishes `order.events` as a single-topic multi-event stream
+registered under Avro `union[...]` subject `order.events-value`. The
+`decisions-log.md` 2026-07-26 entry "Model `order.events` as a single
+Avro union subject" codifies that call but does not pin the policy
+for the OTHER aggregates. Need a rule for Product events.
+
+Decision: Product stays **1:1 file↔topic↔subject**, matching the
+existing inventory / payment / shipping / notification pattern (see
+the contracts/README map table): one event type per topic, one
+subject per topic. Concretely:
+- `product_created_v1.avsc`     → topic `product.events.created`
+                                  → subject `product.events.created-value`
+- `product_price_updated_v1.avsc` → `product.events.price-updated` → ...`-value`
+- `product_activated_v1.avsc`   → `product.events.activated` → ...
+- `product_deactivated_v1.avsc` → `product.events.deactivated` → ...
+
+The `com.edcp.product.events` Avro namespace is shared across all
+four records; only Order uses the single-union-subject form because
+its event stream is consumed as a single append-only log (ADR-005).
+Product / Inventory / Payment / Shipping / Notification each have
+only **a handful of event types per aggregate** and project consumers
+pick topics deliberately rather than as a single stream, so per-event
+topics read better and wire to cleaner consumer group topologies.
+
+Alternatives considered:
+- A single `product.events` union subject mirroring Order — rejected:
+  Product events are independent projection inputs, not an event-
+  sourced aggregate log; the union model brings no consumer benefit.
+- One topic per aggregate plus a generic `ProductEvent` payload with
+  `event_type` enum — rejected: conflates wire contracts with internal
+  domain polymorphism, harder to reason about in Schema Registry /
+  backwards-compat review.
+
+Consequences:
+- Adding a new Product event type = adding a new `.avsc`, a new row
+  to the contracts/README map, and a new topic — independent
+  subject, independent compatibility check.
+- The Product projection consumer subscribes to all four topics
+  (one consumer group `product-projection`).
+- The Order pattern stays the ONLY union subject; document this so
+  nobody later tries to unify Product the same way just because
+  Order did it.
+
+Follow-up: contracts/README.md map table updated; this entry codifies
+the rule so future aggregates get the same per-event-topic treatment
+unless an ADR-005-style event-sourcing requirement forces a union.
+
+---
+
 ## 2026-07-27 — Identity approach: hand-rolled JWT issuer (ADR-014)
 
 Context: Phase 2 needed an Identity approach before scaffolding.

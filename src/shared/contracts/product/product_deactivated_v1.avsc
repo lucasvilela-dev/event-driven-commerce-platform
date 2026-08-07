@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "ProductDeactivated",
+  "namespace": "com.edcp.product.events",
+  "doc": "Published when a Product is deactivated via the DeactivateProduct command. Topic `product.events.deactivated` (subject `product.events.deactivated-value`).",
+  "fields": [
+    { "name": "event_id", "type": "string", "doc": "UUIDv7, idempotency key (ADR-009)." },
+    { "name": "aggregate_id", "type": "string", "doc": "Product id." },
+    { "name": "occurred_at", "type": { "type": "long", "logicalType": "timestamp-millis" } }
+  ]
+}
